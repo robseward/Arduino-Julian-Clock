@@ -2,22 +2,53 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
 
-#define txPin 7
+#define LCD_TX_PIN 7
+#define LCD_RX_PIN 13
+#define GPS_RX_PIN 2
+#define GPS_TX_PIN 3
+#define LED_PIN 13
+//Set this value equal to the baud rate of your GPS
+#define GPSBAUD 4800
 
-SoftwareSerial LCD = SoftwareSerial(0, txPin);
-// since the LCD does not send data back to the Arduino, we should only define the txPin
+SoftwareSerial LCD = SoftwareSerial(LCD_RX_PIN, LCD_TX_PIN);
+// since the LCD does not send data back to the Arduino, we should only define the LCD_TX_PIN
+
+
+
+// Create an instance of the TinyGPS object
+TinyGPS gps;
+// Initialize the NewSoftSerial library to the pins you defined above
+SoftwareSerial uart_gps(GPS_RX_PIN, GPS_TX_PIN);
+
+// This is where you declare prototypes for the functions that will be 
+// using the TinyGPS library.
+void getgps(TinyGPS &gps);
 
 void setup()
 {
+  blinkLed(2, 200);
+  Serial.begin(115200);
 
-  pinMode(txPin, OUTPUT);
-  digitalWrite(txPin, LOW);
-  LCD.begin(9600);
+  pinMode(LCD_TX_PIN, OUTPUT);
+  pinMode(13, OUTPUT); 
+  
+  digitalWrite(LCD_RX_PIN, LOW);
+  digitalWrite(LCD_TX_PIN, LOW);
+
+  uart_gps.begin(GPSBAUD);
+
+  
   delay(1500);
-  digitalWrite(txPin, HIGH);
-  digitalWrite(13, HIGH);
-  delay(700);
-  digitalWrite(13, LOW);
+//  digitalWrite(LCD_TX_PIN, LOW);
+
+  blinkLed(3, 200);
+  LCD.begin(4800);
+  clearSerLcd();
+  
+  Serial.println("");
+  Serial.println("       GPS Shield QuickStart");
+  Serial.println("       ...waiting for lock...           ");
+  Serial.println("");
 }
 
 
@@ -26,47 +57,29 @@ void setup()
 // The delays in the prints to the SerLCD appear to be needed. 
 
 void loop() {
-  // Example usage:
-  clearSerLcd();
-  backlightSerLcd(100);
+  Serial.println("Data from port one: ");
+  LCD.listen();
+  while(LCD.available())
+  {
+    char inByte = LCD.read(); //empty the buffer 
+    Serial.write(inByte);
+  }
   displaySerLcdLine(1, "Backlighting at 100%");
-  delay(1000); 
+  
+  Serial.println("Data from port two: ");
+  //LCD.end();
 
-  //Print text on each line
-  displaySerLcdLine(1, "Line 1 is truncated because it is too long");
-  delay(1000);
-  displaySerLcdLine(2, "Line two");
-  delay(1000);
-  displaySerLcdLine(3, "Line three");
-  delay(1000);
-  displaySerLcdLine(4, "Line four");
-  delay(1000);
-
-  //print a character at the end of each line:
-  displaySerLcdChar(1,20,'*');
-  delay(1000);
-  displaySerLcdChar(2,17,'-');
-  displaySerLcdChar(2,18,'-');
-  displaySerLcdChar(2,19,'>');
-  displaySerLcdChar(2,20,'*');
-  delay(1000);
-  displaySerLcdChar(3,20,'*');
-  delay(1000);
-  displaySerLcdChar(4,20,'*');
-  delay(1000);
-
-  // alter the backlighting
-  backlightSerLcd(50);
-  displaySerLcdLine(1, "Backlighting at 50%");
-  delay(2000);
-  backlightSerLcd(0);
-  displaySerLcdLine(1, "Backlighting off");
-  delay(3000);
-
-  // print full screen
-  backlightSerLcd(50);
-  displaySerLcdScreen("Haiku:              You've been watchingthe Serial LCD      perform many tricks.");
-  delay(4000);
+  uart_gps.listen();
+  while(uart_gps.available())     // While there is data on the RX pin...
+  {  
+      int c = uart_gps.read();    // load the data into a variable...
+      if(gps.encode(c))      // if there is a new valid sentence...
+      {
+        getgps(gps);         // then grab the data.
+      }
+  }
+  //uart_gps.end();
+  //Serial.print(".");
 }
 
 
@@ -202,4 +215,62 @@ void backlightSerLcd(int thePercentage){  //turns on the backlight
   int theValue = map(thePercentage, 0,100,128,157); // maps percentage to what SerLCD wants to see
   LCD.write(theValue);    //light level.
   delay(50);  
+}
+
+/*****  GPS ***********/
+
+// The getgps function will get and print the values we want.
+void getgps(TinyGPS &gps)
+{
+  // To get all of the data into varialbes that you can use in your code, 
+  // all you need to do is define variables and query the object for the 
+  // data. To see the complete list of functions see keywords.txt file in 
+  // the TinyGPS and NewSoftSerial libs.
+  
+  // Define the variables that will be used
+  float latitude, longitude;
+  // Then call this function
+  gps.f_get_position(&latitude, &longitude);
+  // You can now print variables latitude and longitude
+  Serial.print("Lat/Long: "); 
+  Serial.print(latitude,5); 
+  Serial.print(", "); 
+  Serial.println(longitude,5);
+  
+  // Same goes for date and time
+  int year;
+  byte month, day, hour, minute, second, hundredths;
+  gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths);
+  // Print data and time
+  Serial.print("Date: "); Serial.print(month, DEC); Serial.print("/"); 
+  Serial.print(day, DEC); Serial.print("/"); Serial.print(year);
+  Serial.print("  Time: "); Serial.print(hour, DEC); Serial.print(":"); 
+  Serial.print(minute, DEC); Serial.print(":"); Serial.print(second, DEC); 
+  Serial.print("."); Serial.println(hundredths, DEC);
+  //Since month, day, hour, minute, second, and hundr
+  
+  // Here you can print the altitude and course values directly since 
+  // there is only one value for the function
+  Serial.print("Altitude (meters): "); Serial.println(gps.f_altitude());  
+  // Same goes for course
+  Serial.print("Course (degrees): "); Serial.println(gps.f_course()); 
+  // And same goes for speed
+  Serial.print("Speed(kmph): "); Serial.println(gps.f_speed_kmph());
+  Serial.println();
+  
+  // Here you can print statistics on the sentences.
+  unsigned long chars;
+  unsigned short sentences, failed_checksum;
+  gps.stats(&chars, &sentences, &failed_checksum);
+  //Serial.print("Failed Checksums: ");Serial.print(failed_checksum);
+  //Serial.println(); Serial.println();
+}
+
+void blinkLed(int num_blinks, int blinkTime){
+  for(int i=0; i < num_blinks; i++){
+    digitalWrite(LED_PIN, HIGH);
+    delay(blinkTime/2);
+    digitalWrite(LED_PIN, LOW);
+    delay(blinkTime/2);
+  }
 }
