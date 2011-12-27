@@ -1,5 +1,6 @@
 
 #include <SoftwareSerial.h>
+#include <TinyGPS.h>
 
 #define txPin 7
 
