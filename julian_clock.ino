@@ -2,6 +2,9 @@
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
 
+#define LCD_CHAR_PER_LINE 16
+#define LCD_NUM_LINES 2
+
 #define LCD_TX_PIN 7
 #define LCD_RX_PIN 13
 #define GPS_RX_PIN 2
@@ -36,13 +39,13 @@ void setup()
   digitalWrite(LCD_TX_PIN, LOW);
 
   uart_gps.begin(GPSBAUD);
-
+  LCD.begin(9600);
   
   delay(1500);
 //  digitalWrite(LCD_TX_PIN, LOW);
 
   blinkLed(3, 200);
-  LCD.begin(4800);
+
   clearSerLcd();
   
   Serial.println("");
@@ -52,34 +55,33 @@ void setup()
 }
 
 
-// delays in loop() are just there for demonstration purposes. 
-// In real life you can remove them.
-// The delays in the prints to the SerLCD appear to be needed. 
+int testCount = 0;
 
 void loop() {
-  Serial.println("Data from port one: ");
-  LCD.listen();
-  while(LCD.available())
-  {
-    char inByte = LCD.read(); //empty the buffer 
-    Serial.write(inByte);
-  }
-  displaySerLcdLine(1, "Backlighting at 100%");
-  
-  Serial.println("Data from port two: ");
-  //LCD.end();
+
+  displaySerLcdLine(1, "test: ");
+  char charBuf[LCD_CHAR_PER_LINE];
+  String countString = String(testCount);
+  countString.toCharArray(charBuf, LCD_CHAR_PER_LINE);
+  displaySerLcdLine(2, charBuf);
+  testCount++;
+
 
   uart_gps.listen();
-  while(uart_gps.available())     // While there is data on the RX pin...
-  {  
-      int c = uart_gps.read();    // load the data into a variable...
-      if(gps.encode(c))      // if there is a new valid sentence...
-      {
-        getgps(gps);         // then grab the data.
-      }
+  boolean waiting = true;
+
+  while(waiting){
+    while(uart_gps.available())     // While there is data on the RX pin...
+    {  
+        //Serial.println("Data from port two: ");
+        int c = uart_gps.read();    // load the data into a variable...
+        if(gps.encode(c))      // if there is a new valid sentence...
+        {
+          getgps(gps);         // then grab the data.
+          waiting = false;
+        }
+    }
   }
-  //uart_gps.end();
-  //Serial.print(".");
 }
 
 
@@ -97,17 +99,17 @@ void displaySerLcdScreen(char *theText){
   LCD.write(0xFE);   // command flag
   delay(delayTime);
   LCD.write(128);    // start position for line 1
-  if (strlen(theText) < 80) {
+  if (strlen(theText) < LCD_CHAR_PER_LINE * LCD_CHAR_PER_LINE) {
     // less than 80 characters, print then and then 
     LCD.print(theText);
     // pad the rest of the line with spaces
-    for (int i = strlen(theText); i < 80; i++) {
+    for (int i = strlen(theText); i < LCD_CHAR_PER_LINE * LCD_CHAR_PER_LINE; i++) {
       LCD.print(" ");
     } 
   } 
   else {  
     // 80 or more characters, just print the first 80
-    for (int i = 0; i < 80; i++) {
+    for (int i = 0; i < LCD_CHAR_PER_LINE * LCD_CHAR_PER_LINE; i++) {
       LCD.print(theText[i]);
     }
   }
@@ -145,17 +147,17 @@ void displaySerLcdLine(int lineNum, char *theText){
     delay(delayTime);
     LCD.write(lcdPosition);    //position
 
-    if (strlen(theText) < 20) {
+    if (strlen(theText) < LCD_CHAR_PER_LINE){
       // less than 20 characters, print then and then 
       LCD.print(theText);
       // pad the rest of the line with spaces
-      for (int i = strlen(theText); i < 20; i++) {
+      for (int i = strlen(theText); i < LCD_CHAR_PER_LINE; i++) {
         LCD.print(" ");
       } 
     } 
     else {  
       // 20 or more characters, just print the first 20
-      for (int i = 0; i < 20; i++) {
+      for (int i = 0; i < LCD_CHAR_PER_LINE; i++) {
         LCD.print(theText[i]);
       }
     }
@@ -174,7 +176,7 @@ void displaySerLcdChar(int lineNum, int charNum, char theChar){
 
   // charNum has to be within 1 to 20, 
   // lineNum has to be within 1 to 4
-  if (charNum > 0 && charNum < 21) {
+  if (charNum > 0 && charNum < LCD_CHAR_PER_LINE + 1) {
     if (lineNum==1){
       lcdPosition = 128;
     }
@@ -265,6 +267,8 @@ void getgps(TinyGPS &gps)
   //Serial.print("Failed Checksums: ");Serial.print(failed_checksum);
   //Serial.println(); Serial.println();
 }
+
+///////////// MISC //////////////////////////
 
 void blinkLed(int num_blinks, int blinkTime){
   for(int i=0; i < num_blinks; i++){
