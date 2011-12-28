@@ -48,6 +48,7 @@ byte displayMonth, displayDay, displayHour, displayMinute, displaySecond;
 
 static struct pt newSecondThreadStruct, checkGPSThreadStruct;
 
+
 /////////// SETUP & LOOP /////////////
 
 void setup()
@@ -96,11 +97,14 @@ static int newSecondThread(struct pt *pt) {
   static unsigned long timestamp = 0;
   PT_BEGIN(pt);
   while(1) {
-    PT_WAIT_UNTIL(pt, millis() - timestamp > 1000);
-		updateTime();
+		//1326 arduino milliseconds seems about equal to a real second
+    PT_WAIT_UNTIL(pt, millis() - timestamp > 1326);
     timestamp = millis();
+
+		updateTime();
 		updateClockState();
     updateDisplay();
+
   }
   PT_END(pt);
 }
@@ -109,16 +113,38 @@ static int checkGPSThread(struct pt *pt) {
   static unsigned long timestamp = 0;
   PT_BEGIN(pt);
   while(1) {
-    PT_WAIT_UNTIL(pt, (millis() - timestamp > 40000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
+    PT_WAIT_UNTIL(pt, (millis() - timestamp > 30000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
     timestamp = millis();
-		listenToGPS();
-		updateDisplayTimeWithGpsTime();
+		if(listenToGPS()){
+			updateDisplayTimeWithGpsTime();
+			Serial.println("");
+			Serial.print("JULIAN DATE: "); Serial.print(julianDay(), 3);
+			Serial.println("");
+		}
 		updateClockState();
+		Serial.print("GPS Thread: "); Serial.println(millis(), DEC);
   }
   PT_END(pt);
 }
 
+
+
 //////////// CLOCK FUNCTIONS /////////////////
+double julianDay()
+{
+	int a = year/100;
+	int b = a/4;
+	int c = 2-a+b;
+	long e = 365.25 * (year + 4716);
+	long f = 30.6001 * (month+1);
+	return (float)c + (float)day + (float)e + (float)f - 1524.5 + julianDayFraction();
+}
+
+float julianDayFraction()
+{
+	return ((float)(hour)/24.0f) + ((float)minute/1440.0f) + ((float)second/86400.0f);
+}
+
 void updateClockState()
 {
 	if (clockState == GREETING_MESSAGE && millis() - displayMessageStartTime > 3000){
@@ -186,13 +212,13 @@ void updateDisplay()
 }
 
 
-void listenToGPS()
+bool listenToGPS()
 {
 	unsigned long gpsStartTime = millis();
 	uart_gps.listen();
   boolean waiting = true;
 
-  while(waiting){
+  while(waiting && millis() - gpsStartTime < 500){
     while(uart_gps.available())     // While there is data on the RX pin...
     {  
         int c = uart_gps.read();    // load the data into a variable...
@@ -205,6 +231,7 @@ void listenToGPS()
     }
   }
 	Serial.print("GPS WaitTime: "); Serial.println(millis() - gpsStartTime, DEC);
+	return !waiting;
 }
 
 
@@ -236,6 +263,51 @@ void blinkLed(int num_blinks, int blinkTime){
 }
 
 /////////// SERIAL FUNCTIONS /////////////////
+
+void writeTextToLine(int line, char *text)
+{
+	if(line == 1)
+		selectLineOne();
+	if(line == 2)
+		selectLineTwo();
+	
+	
+}
+
+void selectLineOne(){  //puts the cursor at line 0 char 0.
+   Serial.write(0xFE);   //command flag
+   Serial.write(128);    //position
+}
+
+
+void selectLineTwo(){  //puts the cursor at line 0 char 0.
+   Serial.write(0xFE);   //command flag
+   Serial.write(192);    //position
+}
+
+void serCommand(){   //a general function to call the command flag for issuing all other commands   
+  Serial.write(0xFE);
+}
+
+void writeText(char *text)
+{
+  //LCD.write(lcdPosition);    //position
+
+  if (strlen(text) < LCD_CHAR_PER_LINE){
+    // less than 20 characters, print then and then 
+    LCD.print(text);
+    // pad the rest of the line with spaces
+    for (int i = strlen(text); i < LCD_CHAR_PER_LINE; i++) {
+      LCD.print(" ");
+    } 
+  } 
+  else {  
+    // 20 or more characters, just print the first 20
+    for (int i = 0; i < LCD_CHAR_PER_LINE; i++) {
+      LCD.print(text[i]);
+    }
+  }
+}
 
 //SerialLCD Functions
 
@@ -296,7 +368,7 @@ void displaySerLcdLine(int lineNum, char *theText){
   // don't write to the LCD if the lineNum value didn't generate a valid position
   if (lcdPosition > 0){
     LCD.write(0xFE);   //command flag
-    delay(delayTime);
+    //delay(delayTime);
     LCD.write(lcdPosition);    //position
 
     if (strlen(theText) < LCD_CHAR_PER_LINE){
@@ -313,7 +385,7 @@ void displaySerLcdLine(int lineNum, char *theText){
         LCD.print(theText[i]);
       }
     }
-    delay(delayTime);
+    //delay(delayTime);
   }
 }
 
@@ -412,6 +484,7 @@ void getgps(JCTinyGPS &gps)
   // And same goes for speed
   Serial.print("Speed(kmph): "); Serial.println(gps.f_speed_kmph());
   //Serial.println();
+	Serial.print("Arduino Millis: "); Serial.println(millis());
   
   // Here you can print statistics on the sentences.
   unsigned long chars;
