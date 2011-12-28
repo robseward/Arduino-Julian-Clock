@@ -44,7 +44,7 @@ unsigned long displayMessageStartTime = 0;
 int year;
 byte month, day, hour, minute, second, hundredths;
 
-byte displaySeconds = 0;
+byte displayMonth, displayDay, displayHour, displayMinute, displaySecond;
 
 static struct pt newSecondThreadStruct, checkGPSThreadStruct;
 
@@ -84,23 +84,8 @@ void setup()
 int testCount = 0;
 
 void loop() {
-	// updateClockState();
-	
-	// if(newSecond){
-	// 	updateDisplay();
-	// 	displaySeconds++;
-	// 	newSecond = false;
-	// 	// Serial.println("");
-	// 	// Serial.println("New Second");
-	// 	// Serial.println("");
-	// }
-	// else if((int)millis() % 1000 < (int)lastLoopTime % 1000){
-	// 	newSecond = true;
-	// }
-	// lastLoopTime = millis();
 	newSecondThread(&newSecondThreadStruct);
-	checkGPSThread(&checkGPSThreadStruct);
-	
+	checkGPSThread(&checkGPSThreadStruct);	
 }
 
 ///////////// THREADS //////////////
@@ -112,10 +97,10 @@ static int newSecondThread(struct pt *pt) {
   PT_BEGIN(pt);
   while(1) {
     PT_WAIT_UNTIL(pt, millis() - timestamp > 1000);
-		updateClockState();
+		updateTime();
     timestamp = millis();
+		updateClockState();
     updateDisplay();
-		displaySeconds++;
   }
   PT_END(pt);
 }
@@ -124,9 +109,11 @@ static int checkGPSThread(struct pt *pt) {
   static unsigned long timestamp = 0;
   PT_BEGIN(pt);
   while(1) {
-    PT_WAIT_UNTIL(pt, millis() - timestamp > 4000);
+    PT_WAIT_UNTIL(pt, (millis() - timestamp > 40000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
     timestamp = millis();
-    listenToGPS();
+		listenToGPS();
+		updateDisplayTimeWithGpsTime();
+		updateClockState();
   }
   PT_END(pt);
 }
@@ -151,6 +138,21 @@ void updateClockState()
 	}
 }
 
+void updateTime()
+{
+	displaySecond++;
+	if(displaySecond > 59){
+		displaySecond = 0;
+		displayMinute++;
+	}
+	if(displayMinute > 59){
+		displayMinute = 0;
+		displayHour++;
+	}
+	if(displayHour > 23){
+		displayHour = 0;
+	}
+}
 
 void updateDisplay()
 {
@@ -169,9 +171,13 @@ void updateDisplay()
 			displayLine1 = String("THE TIME IS:");
 			break;
 		case DISPLAY_STANDARD_TIME:
-//			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
 //			displayLine2 = String(String(hour) + ":" + String(minute) + ":" + String(displaySeconds));
-			displayLine1 = String(String(displaySeconds));
+			String hourStr = String(displayHour);
+			String minuteStr = String(displayMinute);
+			String secondStr = String(displaySecond);
+			String colon = String(":");
+	    displayLine1 = String(hourStr + colon + minuteStr + colon + secondStr);
 			break;
 		
 	}
@@ -195,11 +201,17 @@ void listenToGPS()
           getgps(gps);              // then grab the data.
           waiting = false;
 					satellitesFound = true;
-					displaySeconds = second;
         }
     }
   }
 	Serial.print("GPS WaitTime: "); Serial.println(millis() - gpsStartTime, DEC);
+}
+
+
+void updateDisplayTimeWithGpsTime(){
+	displaySecond = second;
+	displayMinute = minute;
+	displayHour = hour;
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
