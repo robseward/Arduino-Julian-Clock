@@ -1,6 +1,7 @@
 
 #include <SoftwareSerial.h>
 #include "JCTinyGPS.h"
+#include <pt.h>
 
 #define LCD_CHAR_PER_LINE 16
 #define LCD_NUM_LINES 2
@@ -43,6 +44,12 @@ unsigned long displayMessageStartTime = 0;
 int year;
 byte month, day, hour, minute, second, hundredths;
 
+byte displaySeconds = 0;
+
+static struct pt newSecondThreadStruct, checkGPSThreadStruct;
+
+/////////// SETUP & LOOP /////////////
+
 void setup()
 {
 	
@@ -69,26 +76,60 @@ void setup()
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
 	displayMessageStartTime = millis();
+	PT_INIT(&newSecondThreadStruct);
+	PT_INIT(&checkGPSThreadStruct);
 }
 
 
 int testCount = 0;
 
 void loop() {
-	updateClockState();
+	// updateClockState();
 	
-	if(newSecond){
-		updateDisplay();
-		newSecond = false;
-	}
-	else if((int)millis() % 1000 < (int)lastLoopTime % 1000){
-		newSecond = true;
-	}
-	lastLoopTime = millis();
+	// if(newSecond){
+	// 	updateDisplay();
+	// 	displaySeconds++;
+	// 	newSecond = false;
+	// 	// Serial.println("");
+	// 	// Serial.println("New Second");
+	// 	// Serial.println("");
+	// }
+	// else if((int)millis() % 1000 < (int)lastLoopTime % 1000){
+	// 	newSecond = true;
+	// }
+	// lastLoopTime = millis();
+	newSecondThread(&newSecondThreadStruct);
+	checkGPSThread(&checkGPSThreadStruct);
 	
-	listenToGPS();
 }
 
+///////////// THREADS //////////////
+
+
+
+static int newSecondThread(struct pt *pt) {
+  static unsigned long timestamp = 0;
+  PT_BEGIN(pt);
+  while(1) {
+    PT_WAIT_UNTIL(pt, millis() - timestamp > 1000);
+		updateClockState();
+    timestamp = millis();
+    updateDisplay();
+		displaySeconds++;
+  }
+  PT_END(pt);
+}
+
+static int checkGPSThread(struct pt *pt) {
+  static unsigned long timestamp = 0;
+  PT_BEGIN(pt);
+  while(1) {
+    PT_WAIT_UNTIL(pt, millis() - timestamp > 4000);
+    timestamp = millis();
+    listenToGPS();
+  }
+  PT_END(pt);
+}
 
 //////////// CLOCK FUNCTIONS /////////////////
 void updateClockState()
@@ -128,7 +169,11 @@ void updateDisplay()
 			displayLine1 = String("THE TIME IS:");
 			break;
 		case DISPLAY_STANDARD_TIME:
-			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+//			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+//			displayLine2 = String(String(hour) + ":" + String(minute) + ":" + String(displaySeconds));
+			displayLine1 = String(String(displaySeconds));
+			break;
+		
 	}
 
 	writeMessageToScreen(displayLine1, displayLine2);
@@ -137,6 +182,7 @@ void updateDisplay()
 
 void listenToGPS()
 {
+	unsigned long gpsStartTime = millis();
 	uart_gps.listen();
   boolean waiting = true;
 
@@ -149,9 +195,11 @@ void listenToGPS()
           getgps(gps);              // then grab the data.
           waiting = false;
 					satellitesFound = true;
+					displaySeconds = second;
         }
     }
   }
+	Serial.print("GPS WaitTime: "); Serial.println(millis() - gpsStartTime, DEC);
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
