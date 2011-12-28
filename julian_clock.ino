@@ -86,7 +86,7 @@ void setup()
 int testCount = 0;
 
 void loop() {
-	newSecondThread(&newSecondThreadStruct);
+	//newSecondThread(&newSecondThreadStruct);
 	checkGPSThread(&checkGPSThreadStruct);	
 }
 
@@ -114,16 +114,18 @@ static int checkGPSThread(struct pt *pt) {
   static unsigned long timestamp = 0;
   PT_BEGIN(pt);
   while(1) {
-    PT_WAIT_UNTIL(pt, (millis() - timestamp > 30000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
+    PT_WAIT_UNTIL(pt, (millis() - timestamp > 1000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
     timestamp = millis();
 		if(listenToGPS()){
 			updateDisplayTimeWithGpsTime();
 			Serial.println("");
-			Serial.print("JULIAN DATE: "); Serial.print(julianDay(), 3);
+			Serial.print("JULIAN DATE: "); Serial.println(julianDay(), 3);
+			Serial.print("Fraction: "); Serial.print(julianDayFractionAsLong());
 			Serial.println("");
 		}
 		updateClockState();
 		Serial.print("GPS Thread: "); Serial.println(millis(), DEC);
+		updateDisplay();
   }
   PT_END(pt);
 }
@@ -131,20 +133,7 @@ static int checkGPSThread(struct pt *pt) {
 
 
 //////////// CLOCK FUNCTIONS /////////////////
-double julianDay()
-{
-	int a = year/100;
-	int b = a/4;
-	int c = 2-a+b;
-	long e = 365.25 * (year + 4716);
-	long f = 30.6001 * (month+1);
-	return (float)c + (float)day + (float)e + (float)f - 1524.5 + julianDayFraction();
-}
 
-float julianDayFraction()
-{
-	return ((float)(hour)/24.0f) + ((float)minute/1440.0f) + ((float)second/86400.0f);
-}
 
 void updateClockState()
 {
@@ -161,10 +150,11 @@ void updateClockState()
 	
 	if (clockState == DISPLAY_STANDARD_TIME_MESSAGE && millis() - displayMessageStartTime > 1000){
 		clockState = DISPLAY_STANDARD_TIME;
+		displayMessageStartTime = millis();
 		return;
 	}
 	
-	if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 4000){
+	if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 5000){
 		clockState = DISPLAY_JULIAN_TIME;
 		return;
 	}
@@ -200,7 +190,7 @@ void updateDisplay()
 			displayLine2 = String("  SATELLITES...");
 			break;
 		case DISPLAY_STANDARD_TIME_MESSAGE:
-			displayLine1 = String("THE TIME IS:");
+			displayLine1 = String("UTC TIME:");
 			break;
 		case DISPLAY_STANDARD_TIME:
 			{
@@ -208,20 +198,20 @@ void updateDisplay()
 				String hourStr = String(displayHour);
 				String minuteStr = String(displayMinute);
 				String secondStr = String(displaySecond);
+				secondStr = displaySecond < 10 ? String("0" + secondStr) : secondStr; 
 				String colon = String(":");
 		    displayLine2 = String(hourStr + colon + minuteStr + colon + secondStr);
+				break;
 			}
-			break;
 			
 		case DISPLAY_JULIAN_TIME:
 		{
-			char buf[LCD_CHAR_PER_LINE];
-			dtostrf(julianDay(), LCD_CHAR_PER_LINE, 4, buf );
-			displayLine1 = String(buf);
+			displayLine1 = String("Julian Day:");
+			String beforeDecimal((unsigned long)julianDay());
+			String afterDecimal(julianDayFractionAsLong());
+			displayLine2 = String(beforeDecimal + "." + afterDecimal);
+			break;
 		} 			
-		break;
-			
-		
 	}
 
 	writeMessageToScreen(displayLine1, displayLine2);
@@ -255,6 +245,27 @@ void updateDisplayTimeWithGpsTime(){
 	displaySecond = second;
 	displayMinute = minute;
 	displayHour = hour;
+}
+
+///////////// JULIAN DAY ////////////////
+
+float julianDay()
+{
+	int a = year/100;
+	int b = a/4;
+	int c = 2-a+b;
+	long e = 365.25 * (year + 4716);
+	long f = 30.6001 * (month+1);
+	return (float)c + (float)day + (float)e + (float)f - 1524.5 + julianDayFraction();
+}
+
+float julianDayFraction()
+{
+	return ((float)(hour)/24.0f) + ((float)minute/1440.0f) + ((float)second/86400.0f);
+}
+
+unsigned long julianDayFractionAsLong(){
+	return (julianDayFraction() + .5) * 10000.0f;
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
