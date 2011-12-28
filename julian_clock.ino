@@ -2,6 +2,7 @@
 #include <SoftwareSerial.h>
 #include "JCTinyGPS.h"
 #include <pt.h>
+#include <stdlib.h>
 
 #define LCD_CHAR_PER_LINE 16
 #define LCD_NUM_LINES 2
@@ -162,6 +163,11 @@ void updateClockState()
 		clockState = DISPLAY_STANDARD_TIME;
 		return;
 	}
+	
+	if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 4000){
+		clockState = DISPLAY_JULIAN_TIME;
+		return;
+	}
 }
 
 void updateTime()
@@ -197,14 +203,24 @@ void updateDisplay()
 			displayLine1 = String("THE TIME IS:");
 			break;
 		case DISPLAY_STANDARD_TIME:
-			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
-//			displayLine2 = String(String(hour) + ":" + String(minute) + ":" + String(displaySeconds));
-			String hourStr = String(displayHour);
-			String minuteStr = String(displayMinute);
-			String secondStr = String(displaySecond);
-			String colon = String(":");
-	    displayLine1 = String(hourStr + colon + minuteStr + colon + secondStr);
+			{
+				displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+				String hourStr = String(displayHour);
+				String minuteStr = String(displayMinute);
+				String secondStr = String(displaySecond);
+				String colon = String(":");
+		    displayLine2 = String(hourStr + colon + minuteStr + colon + secondStr);
+			}
 			break;
+			
+		case DISPLAY_JULIAN_TIME:
+		{
+			char buf[LCD_CHAR_PER_LINE];
+			dtostrf(julianDay(), LCD_CHAR_PER_LINE, 4, buf );
+			displayLine1 = String(buf);
+		} 			
+		break;
+			
 		
 	}
 
