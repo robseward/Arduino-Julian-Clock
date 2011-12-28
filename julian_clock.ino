@@ -1,6 +1,6 @@
 
 #include <SoftwareSerial.h>
-#include <TinyGPS.h>
+#include "JCTinyGPS.h"
 
 #define LCD_CHAR_PER_LINE 16
 #define LCD_NUM_LINES 2
@@ -11,24 +11,41 @@
 #define GPS_TX_PIN 3
 #define LED_PIN 13
 //Set this value equal to the baud rate of your GPS
-#define GPSBAUD 4800
+#define GPS_BAUD 4800
+#define LCD_BAUD 9600
 
 SoftwareSerial LCD = SoftwareSerial(LCD_RX_PIN, LCD_TX_PIN);
-// since the LCD does not send data back to the Arduino, we should only define the LCD_TX_PIN
-
-
 
 // Create an instance of the TinyGPS object
-TinyGPS gps;
+JCTinyGPS gps;
 // Initialize the NewSoftSerial library to the pins you defined above
 SoftwareSerial uart_gps(GPS_RX_PIN, GPS_TX_PIN);
 
 // This is where you declare prototypes for the functions that will be 
 // using the TinyGPS library.
-void getgps(TinyGPS &gps);
+void getgps(JCTinyGPS &gps);
+
+typedef enum {
+	GREETING_MESSAGE,
+	LOOKING_FOR_SATELLITES,
+	DISPLAY_STANDARD_TIME_MESSAGE,
+	DISPLAY_STANDARD_TIME,
+	DISPLAY_JULIAN_TIME
+} ClockState;
+
+ClockState clockState = GREETING_MESSAGE;
+
+bool satellitesFound = false;
+bool newSecond = true;
+unsigned long lastLoopTime;
+unsigned long displayMessageStartTime = 0;
+
+int year;
+byte month, day, hour, minute, second, hundredths;
 
 void setup()
 {
+	
   blinkLed(2, 200);
   Serial.begin(115200);
 
@@ -38,11 +55,10 @@ void setup()
   digitalWrite(LCD_RX_PIN, LOW);
   digitalWrite(LCD_TX_PIN, LOW);
 
-  uart_gps.begin(GPSBAUD);
-  LCD.begin(9600);
+  uart_gps.begin(GPS_BAUD);
+  LCD.begin(LCD_BAUD);
   
-  delay(1500);
-//  digitalWrite(LCD_TX_PIN, LOW);
+  delay(1500);	//Give serial display a chance to reset itself
 
   blinkLed(3, 200);
 
@@ -52,38 +68,114 @@ void setup()
   Serial.println("       GPS Shield QuickStart");
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
+	displayMessageStartTime = millis();
 }
 
 
 int testCount = 0;
 
 void loop() {
+	updateClockState();
+	
+	if(newSecond){
+		updateDisplay();
+		newSecond = false;
+	}
+	else if((int)millis() % 1000 < (int)lastLoopTime % 1000){
+		newSecond = true;
+	}
+	lastLoopTime = millis();
+	
+	listenToGPS();
+}
 
-  displaySerLcdLine(1, "test: ");
-  char charBuf[LCD_CHAR_PER_LINE];
-  String countString = String(testCount);
-  countString.toCharArray(charBuf, LCD_CHAR_PER_LINE);
-  displaySerLcdLine(2, charBuf);
-  testCount++;
+
+//////////// CLOCK FUNCTIONS /////////////////
+void updateClockState()
+{
+	if (clockState == GREETING_MESSAGE && millis() - displayMessageStartTime > 3000){
+		clockState = LOOKING_FOR_SATELLITES;
+		return;
+	}
+	
+	if (clockState == LOOKING_FOR_SATELLITES && satellitesFound){
+		clockState = DISPLAY_STANDARD_TIME_MESSAGE;
+		displayMessageStartTime = millis();
+		return;
+	}
+	
+	if (clockState == DISPLAY_STANDARD_TIME_MESSAGE && millis() - displayMessageStartTime > 1000){
+		clockState = DISPLAY_STANDARD_TIME;
+		return;
+	}
+}
 
 
-  uart_gps.listen();
+void updateDisplay()
+{
+	String displayLine1;
+	String displayLine2;
+	switch(clockState){
+		case GREETING_MESSAGE:
+			displayLine1 = String(" HAPPY BIRTHDAY ");
+			displayLine2 = String("      DAD!      ");
+			break;
+		case LOOKING_FOR_SATELLITES:
+			displayLine1 = String("  LOOKING FOR  ");
+			displayLine2 = String("  SATELLITES...");
+			break;
+		case DISPLAY_STANDARD_TIME_MESSAGE:
+			displayLine1 = String("THE TIME IS:");
+			break;
+		case DISPLAY_STANDARD_TIME:
+			displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+	}
+
+	writeMessageToScreen(displayLine1, displayLine2);
+}
+
+
+void listenToGPS()
+{
+	uart_gps.listen();
   boolean waiting = true;
 
   while(waiting){
     while(uart_gps.available())     // While there is data on the RX pin...
     {  
-        //Serial.println("Data from port two: ");
         int c = uart_gps.read();    // load the data into a variable...
-        if(gps.encode(c))      // if there is a new valid sentence...
+        if(gps.encode(c))           // if there is a new valid sentence...
         {
-          getgps(gps);         // then grab the data.
+          getgps(gps);              // then grab the data.
           waiting = false;
+					satellitesFound = true;
         }
     }
   }
 }
 
+///////////// COCK HELPER FUNCTIONS ////////
+
+void writeMessageToScreen(String line1, String line2)
+{
+	char charBuf1[LCD_CHAR_PER_LINE];
+	line1.toCharArray(charBuf1, LCD_CHAR_PER_LINE);
+	displaySerLcdLine(1, charBuf1);
+	char charBuf2[LCD_CHAR_PER_LINE];
+	line2.toCharArray(charBuf2, LCD_CHAR_PER_LINE);
+	displaySerLcdLine(2, charBuf2);
+}
+
+void blinkLed(int num_blinks, int blinkTime){
+  for(int i=0; i < num_blinks; i++){
+    digitalWrite(LED_PIN, HIGH);
+    delay(blinkTime/2);
+    digitalWrite(LED_PIN, LOW);
+    delay(blinkTime/2);
+  }
+}
+
+/////////// SERIAL FUNCTIONS /////////////////
 
 //SerialLCD Functions
 
@@ -222,12 +314,12 @@ void backlightSerLcd(int thePercentage){  //turns on the backlight
 /*****  GPS ***********/
 
 // The getgps function will get and print the values we want.
-void getgps(TinyGPS &gps)
+void getgps(JCTinyGPS &gps)
 {
   // To get all of the data into varialbes that you can use in your code, 
   // all you need to do is define variables and query the object for the 
   // data. To see the complete list of functions see keywords.txt file in 
-  // the TinyGPS and NewSoftSerial libs.
+  // the JCTinyGPS and NewSoftSerial libs.
   
   // Define the variables that will be used
   float latitude, longitude;
@@ -240,8 +332,7 @@ void getgps(TinyGPS &gps)
   Serial.println(longitude,5);
   
   // Same goes for date and time
-  int year;
-  byte month, day, hour, minute, second, hundredths;
+  
   gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths);
   // Print data and time
   Serial.print("Date: "); Serial.print(month, DEC); Serial.print("/"); 
@@ -251,6 +342,8 @@ void getgps(TinyGPS &gps)
   Serial.print("."); Serial.println(hundredths, DEC);
   //Since month, day, hour, minute, second, and hundr
   
+
+  
   // Here you can print the altitude and course values directly since 
   // there is only one value for the function
   Serial.print("Altitude (meters): "); Serial.println(gps.f_altitude());  
@@ -258,23 +351,20 @@ void getgps(TinyGPS &gps)
   Serial.print("Course (degrees): "); Serial.println(gps.f_course()); 
   // And same goes for speed
   Serial.print("Speed(kmph): "); Serial.println(gps.f_speed_kmph());
-  Serial.println();
+  //Serial.println();
   
   // Here you can print statistics on the sentences.
   unsigned long chars;
   unsigned short sentences, failed_checksum;
   gps.stats(&chars, &sentences, &failed_checksum);
-  //Serial.print("Failed Checksums: ");Serial.print(failed_checksum);
-  //Serial.println(); Serial.println();
+  Serial.print("Chars: "); Serial.println(chars, DEC);
+  Serial.print("Sentences: "); Serial.println(sentences, DEC);
+  Serial.print("Failed Checksums: ");Serial.println(failed_checksum);
+  Serial.println(); Serial.println();
 }
 
 ///////////// MISC //////////////////////////
 
-void blinkLed(int num_blinks, int blinkTime){
-  for(int i=0; i < num_blinks; i++){
-    digitalWrite(LED_PIN, HIGH);
-    delay(blinkTime/2);
-    digitalWrite(LED_PIN, LOW);
-    delay(blinkTime/2);
-  }
-}
+
+
+
