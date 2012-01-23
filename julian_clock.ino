@@ -120,6 +120,7 @@ static int checkGPSThread(struct pt *pt) {
 			updateDisplayTimeWithGpsTime();
 			Serial.println("");
 			Serial.print("JULIAN DATE: "); Serial.println(julianDay(), 3);
+			Serial.print("Julian Float: "); Serial.println(julianDayFraction() + 0.5, 5);
 			Serial.print("Fraction: "); Serial.print(julianDayFractionAsLong());
 			Serial.println("");
 		}
@@ -265,7 +266,7 @@ float julianDayFraction()
 }
 
 unsigned long julianDayFractionAsLong(){
-	return (julianDayFraction() + .5) * 10000.0f;
+	return (unsigned long)((julianDayFraction() + .5) * 10000.0f) % 10000;
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
