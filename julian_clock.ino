@@ -28,12 +28,13 @@ SoftwareSerial uart_gps(GPS_RX_PIN, GPS_TX_PIN);
 void getgps(JCTinyGPS &gps);
 
 typedef enum {
-	GREETING_MESSAGE,
-	LOOKING_FOR_SATELLITES,
-	DISPLAY_STANDARD_TIME_MESSAGE,
-	DISPLAY_STANDARD_TIME,
-	DISPLAY_JULIAN_TIME
-} ClockState;
+  GREETING_MESSAGE,
+  LOOKING_FOR_SATELLITES,
+  DISPLAY_STANDARD_TIME_MESSAGE,
+  DISPLAY_STANDARD_TIME,
+  DISPLAY_JULIAN_TIME
+} 
+ClockState;
 
 ClockState clockState = GREETING_MESSAGE;
 
@@ -54,40 +55,40 @@ static struct pt newSecondThreadStruct, checkGPSThreadStruct;
 
 void setup()
 {
-	
+
   blinkLed(2, 200);
   Serial.begin(115200);
 
   pinMode(LCD_TX_PIN, OUTPUT);
   pinMode(13, OUTPUT); 
-  
+
   digitalWrite(LCD_RX_PIN, LOW);
   digitalWrite(LCD_TX_PIN, LOW);
 
   uart_gps.begin(GPS_BAUD);
   LCD.begin(LCD_BAUD);
-  
+
   delay(1500);	//Give serial display a chance to reset itself
 
   blinkLed(3, 200);
 
   clearSerLcd();
-  
+
   Serial.println("");
   Serial.println("       GPS Shield QuickStart");
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
-	displayMessageStartTime = millis();
-	PT_INIT(&newSecondThreadStruct);
-	PT_INIT(&checkGPSThreadStruct);
+  displayMessageStartTime = millis();
+  PT_INIT(&newSecondThreadStruct);
+  PT_INIT(&checkGPSThreadStruct);
 }
 
 
 int testCount = 0;
 
 void loop() {
-	//newSecondThread(&newSecondThreadStruct);
-	checkGPSThread(&checkGPSThreadStruct);	
+  //newSecondThread(&newSecondThreadStruct);
+  checkGPSThread(&checkGPSThreadStruct);	
 }
 
 ///////////// THREADS //////////////
@@ -98,12 +99,12 @@ static int newSecondThread(struct pt *pt) {
   static unsigned long timestamp = 0;
   PT_BEGIN(pt);
   while(1) {
-		//1326 arduino milliseconds seems about equal to a real second
+    //1326 arduino milliseconds seems about equal to a real second
     PT_WAIT_UNTIL(pt, millis() - timestamp > 1326);
     timestamp = millis();
 
-		updateTime();
-		updateClockState();
+    updateTime();
+    updateClockState();
     updateDisplay();
 
   }
@@ -116,17 +117,21 @@ static int checkGPSThread(struct pt *pt) {
   while(1) {
     PT_WAIT_UNTIL(pt, (millis() - timestamp > 1000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
     timestamp = millis();
-		if(listenToGPS()){
-			updateDisplayTimeWithGpsTime();
-			Serial.println("");
-			Serial.print("JULIAN DATE: "); Serial.println(julianDay(), 3);
-			Serial.print("Julian Float: "); Serial.println(julianDayFraction() + 0.5, 5);
-			Serial.print("Fraction: "); Serial.print(julianDayFractionAsLong());
-			Serial.println("");
-		}
-		updateClockState();
-		Serial.print("GPS Thread: "); Serial.println(millis(), DEC);
-		updateDisplay();
+    if(listenToGPS()){
+      updateDisplayTimeWithGpsTime();
+      Serial.println("");
+      Serial.print("JULIAN DATE: "); 
+      Serial.println(julianDay(), 3);
+      Serial.print("Julian Float: "); 
+      Serial.println(julianDayFraction() + 0.5, 5);
+      Serial.print("Fraction: "); 
+      Serial.print(julianDayFractionAsLong());
+      Serial.println("");
+    }
+    updateClockState();
+    Serial.print("GPS Thread: "); 
+    Serial.println(millis(), DEC);
+    updateDisplay();
   }
   PT_END(pt);
 }
@@ -138,147 +143,148 @@ static int checkGPSThread(struct pt *pt) {
 
 void updateClockState()
 {
-	if (clockState == GREETING_MESSAGE && millis() - displayMessageStartTime > 3000){
-		clockState = LOOKING_FOR_SATELLITES;
-		return;
-	}
-	
-	if (clockState == LOOKING_FOR_SATELLITES && satellitesFound){
-		clockState = DISPLAY_STANDARD_TIME_MESSAGE;
-		displayMessageStartTime = millis();
-		return;
-	}
-	
-	if (clockState == DISPLAY_STANDARD_TIME_MESSAGE && millis() - displayMessageStartTime > 1000){
-		clockState = DISPLAY_STANDARD_TIME;
-		displayMessageStartTime = millis();
-		return;
-	}
-	
-	if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 5000){
-		clockState = DISPLAY_JULIAN_TIME;
-		return;
-	}
+  if (clockState == GREETING_MESSAGE && millis() - displayMessageStartTime > 3000){
+    clockState = LOOKING_FOR_SATELLITES;
+    return;
+  }
+
+  if (clockState == LOOKING_FOR_SATELLITES && satellitesFound){
+    clockState = DISPLAY_STANDARD_TIME_MESSAGE;
+    displayMessageStartTime = millis();
+    return;
+  }
+
+  if (clockState == DISPLAY_STANDARD_TIME_MESSAGE && millis() - displayMessageStartTime > 1000){
+    clockState = DISPLAY_STANDARD_TIME;
+    displayMessageStartTime = millis();
+    return;
+  }
+
+  if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 5000){
+    clockState = DISPLAY_JULIAN_TIME;
+    return;
+  }
 }
 
 void updateTime()
 {
-	displaySecond++;
-	if(displaySecond > 59){
-		displaySecond = 0;
-		displayMinute++;
-	}
-	if(displayMinute > 59){
-		displayMinute = 0;
-		displayHour++;
-	}
-	if(displayHour > 23){
-		displayHour = 0;
-	}
+  displaySecond++;
+  if(displaySecond > 59){
+    displaySecond = 0;
+    displayMinute++;
+  }
+  if(displayMinute > 59){
+    displayMinute = 0;
+    displayHour++;
+  }
+  if(displayHour > 23){
+    displayHour = 0;
+  }
 }
 
 void updateDisplay()
 {
-	String displayLine1;
-	String displayLine2;
-	switch(clockState){
-		case GREETING_MESSAGE:
-			displayLine1 = String(" HAPPY BIRTHDAY ");
-			displayLine2 = String("      DAD!      ");
-			break;
-		case LOOKING_FOR_SATELLITES:
-			displayLine1 = String("  LOOKING FOR  ");
-			displayLine2 = String("  SATELLITES...");
-			break;
-		case DISPLAY_STANDARD_TIME_MESSAGE:
-			displayLine1 = String("UTC TIME:");
-			break;
-		case DISPLAY_STANDARD_TIME:
-			{
-				displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
-				String hourStr = String(displayHour);
-				String minuteStr = String(displayMinute);
-				String secondStr = String(displaySecond);
-				secondStr = displaySecond < 10 ? String("0" + secondStr) : secondStr; 
-				String colon = String(":");
-		    displayLine2 = String(hourStr + colon + minuteStr + colon + secondStr);
-				break;
-			}
-			
-		case DISPLAY_JULIAN_TIME:
-		{
-			displayLine1 = String("Julian Day:");
-			String beforeDecimal((unsigned long)julianDay());
-			String afterDecimal(julianDayFractionAsLong());
-			displayLine2 = String(beforeDecimal + "." + afterDecimal);
-			break;
-		} 			
-	}
+  String displayLine1;
+  String displayLine2;
+  switch(clockState){
+  case GREETING_MESSAGE:
+    displayLine1 = String(" HAPPY BIRTHDAY ");
+    displayLine2 = String("      DAD!      ");
+    break;
+  case LOOKING_FOR_SATELLITES:
+    displayLine1 = String("  LOOKING FOR  ");
+    displayLine2 = String("  SATELLITES...");
+    break;
+  case DISPLAY_STANDARD_TIME_MESSAGE:
+    displayLine1 = String("UTC TIME:");
+    break;
+  case DISPLAY_STANDARD_TIME:
+    {
+      displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+      String hourStr = String(displayHour);
+      String minuteStr = String(displayMinute);
+      String secondStr = String(displaySecond);
+      secondStr = displaySecond < 10 ? String("0" + secondStr) : secondStr; 
+      String colon = String(":");
+      displayLine2 = String(hourStr + colon + minuteStr + colon + secondStr);
+      break;
+    }
 
-	writeMessageToScreen(displayLine1, displayLine2);
+  case DISPLAY_JULIAN_TIME:
+    {
+      displayLine1 = String("Julian Day:");
+      String beforeDecimal((unsigned long)julianDay());
+      String afterDecimal(julianDayFractionAsLong());
+      displayLine2 = String(beforeDecimal + "." + afterDecimal);
+      break;
+    } 			
+  }
+
+  writeMessageToScreen(displayLine1, displayLine2);
 }
 
 
 bool listenToGPS()
 {
-	unsigned long gpsStartTime = millis();
-	uart_gps.listen();
+  unsigned long gpsStartTime = millis();
+  uart_gps.listen();
   boolean waiting = true;
 
   while(waiting && millis() - gpsStartTime < 500){
     while(uart_gps.available())     // While there is data on the RX pin...
     {  
-        int c = uart_gps.read();    // load the data into a variable...
-        if(gps.encode(c))           // if there is a new valid sentence...
-        {
-          getgps(gps);              // then grab the data.
-          waiting = false;
-					satellitesFound = true;
-        }
+      int c = uart_gps.read();    // load the data into a variable...
+      if(gps.encode(c))           // if there is a new valid sentence...
+      {
+        getgps(gps);              // then grab the data.
+        waiting = false;
+        satellitesFound = true;
+      }
     }
   }
-	Serial.print("GPS WaitTime: "); Serial.println(millis() - gpsStartTime, DEC);
-	return !waiting;
+  Serial.print("GPS WaitTime: "); 
+  Serial.println(millis() - gpsStartTime, DEC);
+  return !waiting;
 }
 
 
 void updateDisplayTimeWithGpsTime(){
-	displaySecond = second;
-	displayMinute = minute;
-	displayHour = hour;
+  displaySecond = second;
+  displayMinute = minute;
+  displayHour = hour;
 }
 
 ///////////// JULIAN DAY ////////////////
 
 float julianDay()
 {
-	int a = year/100;
-	int b = a/4;
-	int c = 2-a+b;
-	long e = 365.25 * (year + 4716);
-	long f = 30.6001 * (month+1);
-	return (float)c + (float)day + (float)e + (float)f - 1524.5 + julianDayFraction();
+  int a = year/100;
+  int b = a/4;
+  int c = 2-a+b;
+  long e = 365.25 * (year + 4716);
+  long f = 30.6001 * (month+1);
+  return (float)c + (float)day + (float)e + (float)f - 1524.5 + julianDayFraction();
 }
 
 float julianDayFraction()
 {
-	return ((float)(hour)/24.0f) + ((float)minute/1440.0f) + ((float)second/86400.0f);
+  return ((float)(hour)/24.0f) + ((float)minute/1440.0f) + ((float)second/86400.0f);
 }
 
 unsigned long julianDayFractionAsLong(){
-	return (unsigned long)((julianDayFraction() + .5) * 10000.0f) % 10000;
+  return (unsigned long)((julianDayFraction() + .5) * 10000.0f) % 10000;
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
 
 void writeMessageToScreen(String line1, String line2)
 {
-	char charBuf1[LCD_CHAR_PER_LINE];
-	line1.toCharArray(charBuf1, LCD_CHAR_PER_LINE);
-	displaySerLcdLine(1, charBuf1);
-	char charBuf2[LCD_CHAR_PER_LINE];
-	line2.toCharArray(charBuf2, LCD_CHAR_PER_LINE);
-	displaySerLcdLine(2, charBuf2);
+  char charBuf1[LCD_CHAR_PER_LINE];
+  line1.toCharArray(charBuf1, LCD_CHAR_PER_LINE);
+  displaySerLcdLine(1, charBuf1);
+  char charBuf2[LCD_CHAR_PER_LINE];
+  line2.toCharArray(charBuf2, LCD_CHAR_PER_LINE);
+  displaySerLcdLine(2, charBuf2);
 }
 
 void blinkLed(int num_blinks, int blinkTime){
@@ -294,23 +300,23 @@ void blinkLed(int num_blinks, int blinkTime){
 
 void writeTextToLine(int line, char *text)
 {
-	if(line == 1)
-		selectLineOne();
-	if(line == 2)
-		selectLineTwo();
-	
-	
+  if(line == 1)
+    selectLineOne();
+  if(line == 2)
+    selectLineTwo();
+
+
 }
 
 void selectLineOne(){  //puts the cursor at line 0 char 0.
-   Serial.write(0xFE);   //command flag
-   Serial.write(128);    //position
+  Serial.write(0xFE);   //command flag
+  Serial.write(128);    //position
 }
 
 
 void selectLineTwo(){  //puts the cursor at line 0 char 0.
-   Serial.write(0xFE);   //command flag
-   Serial.write(192);    //position
+  Serial.write(0xFE);   //command flag
+  Serial.write(192);    //position
 }
 
 void serCommand(){   //a general function to call the command flag for issuing all other commands   
@@ -399,7 +405,7 @@ void displaySerLcdLine(int lineNum, char *theText){
     //delay(delayTime);
     LCD.write(lcdPosition);    //position
 
-    if (strlen(theText) < LCD_CHAR_PER_LINE){
+      if (strlen(theText) < LCD_CHAR_PER_LINE){
       // less than 20 characters, print then and then 
       LCD.print(theText);
       // pad the rest of the line with spaces
@@ -480,7 +486,7 @@ void getgps(JCTinyGPS &gps)
   // all you need to do is define variables and query the object for the 
   // data. To see the complete list of functions see keywords.txt file in 
   // the JCTinyGPS and NewSoftSerial libs.
-  
+
   // Define the variables that will be used
   float latitude, longitude;
   // Then call this function
@@ -490,41 +496,59 @@ void getgps(JCTinyGPS &gps)
   Serial.print(latitude,5); 
   Serial.print(", "); 
   Serial.println(longitude,5);
-  
+
   // Same goes for date and time
-  
+
   gps.crack_datetime(&year,&month,&day,&hour,&minute,&second,&hundredths);
   // Print data and time
-  Serial.print("Date: "); Serial.print(month, DEC); Serial.print("/"); 
-  Serial.print(day, DEC); Serial.print("/"); Serial.print(year);
-  Serial.print("  Time: "); Serial.print(hour, DEC); Serial.print(":"); 
-  Serial.print(minute, DEC); Serial.print(":"); Serial.print(second, DEC); 
-  Serial.print("."); Serial.println(hundredths, DEC);
+  Serial.print("Date: "); 
+  Serial.print(month, DEC); 
+  Serial.print("/"); 
+  Serial.print(day, DEC); 
+  Serial.print("/"); 
+  Serial.print(year);
+  Serial.print("  Time: "); 
+  Serial.print(hour, DEC); 
+  Serial.print(":"); 
+  Serial.print(minute, DEC); 
+  Serial.print(":"); 
+  Serial.print(second, DEC); 
+  Serial.print("."); 
+  Serial.println(hundredths, DEC);
   //Since month, day, hour, minute, second, and hundr
-  
 
-  
+
+
   // Here you can print the altitude and course values directly since 
   // there is only one value for the function
-  Serial.print("Altitude (meters): "); Serial.println(gps.f_altitude());  
+  Serial.print("Altitude (meters): "); 
+  Serial.println(gps.f_altitude());  
   // Same goes for course
-  Serial.print("Course (degrees): "); Serial.println(gps.f_course()); 
+  Serial.print("Course (degrees): "); 
+  Serial.println(gps.f_course()); 
   // And same goes for speed
-  Serial.print("Speed(kmph): "); Serial.println(gps.f_speed_kmph());
+  Serial.print("Speed(kmph): "); 
+  Serial.println(gps.f_speed_kmph());
   //Serial.println();
-	Serial.print("Arduino Millis: "); Serial.println(millis());
-  
+  Serial.print("Arduino Millis: "); 
+  Serial.println(millis());
+
   // Here you can print statistics on the sentences.
   unsigned long chars;
   unsigned short sentences, failed_checksum;
   gps.stats(&chars, &sentences, &failed_checksum);
-  Serial.print("Chars: "); Serial.println(chars, DEC);
-  Serial.print("Sentences: "); Serial.println(sentences, DEC);
-  Serial.print("Failed Checksums: ");Serial.println(failed_checksum);
-  Serial.println(); Serial.println();
+  Serial.print("Chars: "); 
+  Serial.println(chars, DEC);
+  Serial.print("Sentences: "); 
+  Serial.println(sentences, DEC);
+  Serial.print("Failed Checksums: ");
+  Serial.println(failed_checksum);
+  Serial.println(); 
+  Serial.println();
 }
 
 ///////////// MISC //////////////////////////
+
 
 
 
