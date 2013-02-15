@@ -9,8 +9,9 @@
 
 #define LCD_TX_PIN 7
 #define LCD_RX_PIN 13
-#define GPS_RX_PIN 2
-#define GPS_TX_PIN 3
+#define GPS_RX_PIN 4
+#define GPS_TX_PIN 5
+#define GPS_CLOCK_PIN 2
 #define LED_PIN 13
 //Set this value equal to the baud rate of your GPS
 #define GPS_BAUD 4800
@@ -50,6 +51,8 @@ byte displayMonth, displayDay, displayHour, displayMinute, displaySecond;
 
 static struct pt newSecondThreadStruct, checkGPSThreadStruct;
 
+volatile int gpsClockPinHigh = 0;
+
 
 /////////// SETUP & LOOP /////////////
 
@@ -65,10 +68,21 @@ void setup()
   digitalWrite(LCD_RX_PIN, LOW);
   digitalWrite(LCD_TX_PIN, LOW);
 
+  //0 is INT0, equivelent to digital pin 2 (GPS_CLOCK_PIN)
+  attachInterrupt(0, gpsClockPinHighFunction, RISING);
+  
   uart_gps.begin(GPS_BAUD);
   LCD.begin(LCD_BAUD);
 
   delay(1500);	//Give serial display a chance to reset itself
+
+  //Tell GPS to send ZDA messages
+  delay(10);
+  uart_gps.print("$PSRF103,08,00,01,00*2C");
+  //uart_gps.print("$PSRF103,07,00,00,01*23");
+  uart_gps.write(0x0D);
+  uart_gps.write(0x0A);
+  delay(10);
 
   blinkLed(3, 200);
 
@@ -81,6 +95,8 @@ void setup()
   displayMessageStartTime = millis();
   PT_INIT(&newSecondThreadStruct);
   PT_INIT(&checkGPSThreadStruct);
+  
+
 }
 
 
@@ -88,7 +104,25 @@ int testCount = 0;
 
 void loop() {
   //newSecondThread(&newSecondThreadStruct);
-  checkGPSThread(&checkGPSThreadStruct);	
+  //checkGPSThread(&checkGPSThreadStruct);
+  if(gpsClockPinHigh){
+    if(listenToGPS()){
+        updateDisplayTimeWithGpsTime();
+        Serial.println("");
+        Serial.print("JULIAN DATE: "); 
+        Serial.println(julianDay(), 3);
+        Serial.print("Julian Float: "); 
+        Serial.println(julianDayFraction() + 0.5, 5);
+        Serial.print("Fraction: "); 
+        Serial.print(julianDayFractionAsLong());
+        Serial.println("");
+    }
+    updateClockState();
+    Serial.print("GPS Thread: "); 
+    Serial.println(millis(), DEC);
+    updateDisplay();
+    gpsClockPinHigh = 0;
+  }	
 }
 
 ///////////// THREADS //////////////
@@ -136,7 +170,14 @@ static int checkGPSThread(struct pt *pt) {
   PT_END(pt);
 }
 
+///////// INTERRUPT /////////
 
+void gpsClockPinHighFunction()
+{
+  Serial.println("GPS CLOCK PIN HIGH");
+  gpsClockPinHigh = 1;
+
+}
 
 //////////// CLOCK FUNCTIONS /////////////////
 
@@ -226,6 +267,7 @@ void updateDisplay()
 
 bool listenToGPS()
 {
+  Serial.print("Listening...");
   unsigned long gpsStartTime = millis();
   uart_gps.listen();
   boolean waiting = true;
