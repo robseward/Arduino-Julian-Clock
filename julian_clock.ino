@@ -70,14 +70,32 @@ void setup()
 
   delay(1500);	//Give serial display a chance to reset itself
 
-  //Tell GPS to send ZDA messages
-  delay(10);
-  uart_gps.print("$PSRF103,08,00,01,00*2C");
-  //uart_gps.print("$PSRF103,07,00,00,01*23");
-  uart_gps.write(0x0D);
-  uart_gps.write(0x0A);
-  delay(10);
   blinkLed(3, 200);
+
+  //Disable automatic messages from GPS
+  delay(10);
+  uart_gps.print("$PSRF103,00,00,00,01*24\r\n"); //GGA
+  delay(10);
+  uart_gps.print("$PSRF103,01,00,00,01*25\r\n"); //GLL
+  delay(10);
+  uart_gps.print("$PSRF103,02,00,00,01*26\r\n"); //GSA
+  delay(10);
+  uart_gps.print("$PSRF103,03,00,00,01*27\r\n"); //GSV
+  delay(10);
+  uart_gps.print("$PSRF103,04,00,00,01*20\r\n"); //RMC
+  delay(10);
+  uart_gps.print("$PSRF103,05,00,00,01*21\r\n"); //VTG
+  delay(10);
+  uart_gps.print("$PSRF103,06,00,00,01*22\r\n"); //MSS
+  delay(10);
+  uart_gps.print("$PSRF103,07,00,00,01*23\r\n"); ///////ZDA
+  delay(10);
+
+  //Enable RMC
+
+  //uart_gps.print("$PSRF103,04,00,01,01*21\r\n"); //RMC
+  //delay(10);
+
 
   clearSerLcd();
 
@@ -88,25 +106,25 @@ void setup()
   displayMessageStartTime = millis();
 }
 
-
 void loop() {
+  uart_gps.print("$PSRF103,04,01,01,01*20\r\n"); //RMC query
   //printGPS();
-    if(listenToGPS()){
-        updateDisplayTimeWithGpsTime();
-        Serial.println("");
-        Serial.print("JULIAN DATE: "); 
-        Serial.println(julianDay(), 3);
-        Serial.print("Julian Float: "); 
-        Serial.println(julianDayFraction() + 0.5, 5);
-        Serial.print("Fraction: "); 
-        Serial.print(julianDayFractionAsLong());
-        Serial.println("");
-    }
-    updateClockState();
-    Serial.print("GPS Thread: "); 
-    Serial.println(millis(), DEC);
-    updateDisplay();
-    gpsClockPinHigh = 0;
+  if(listenToGPS()){
+    updateDisplayTimeWithGpsTime();
+    Serial.println("");
+    Serial.print("JULIAN DATE: "); 
+    Serial.println(julianDay(), 3);
+    Serial.print("Julian Float: "); 
+    Serial.println(julianDayFraction() + 0.5, 5);
+    Serial.print("Fraction: "); 
+    Serial.print(julianDayFractionAsLong());
+    Serial.println("");
+  }
+  updateClockState();
+  Serial.print("GPS Thread: "); 
+  Serial.println(millis(), DEC);
+  updateDisplay();
+  gpsClockPinHigh = 0;
 }
 
 void printGPS()
@@ -147,7 +165,7 @@ void updateClockState()
     return;
   }
 
-  if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 5000){
+  if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 8000){
     clockState = DISPLAY_JULIAN_TIME;
     return;
   }
@@ -218,7 +236,7 @@ bool listenToGPS()
   uart_gps.listen();
   boolean waiting = true;
 
-  while(waiting && millis() - gpsStartTime < 500){
+  while(waiting && millis() - gpsStartTime < 5000){
     while(uart_gps.available())     // While there is data on the RX pin...
     {  
       int c = uart_gps.read();    // load the data into a variable...
@@ -536,6 +554,7 @@ void getgps(JCTinyGPS &gps)
 }
 
 ///////////// MISC //////////////////////////
+
 
 
 
