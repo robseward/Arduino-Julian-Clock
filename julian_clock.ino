@@ -70,7 +70,7 @@ void setup()
 
   //0 is INT0, equivelent to digital pin 2 (GPS_CLOCK_PIN)
   attachInterrupt(0, gpsClockPinHighFunction, RISING);
-  
+
   uart_gps.begin(GPS_BAUD);
   LCD.begin(LCD_BAUD);
 
@@ -95,7 +95,7 @@ void setup()
   displayMessageStartTime = millis();
   PT_INIT(&newSecondThreadStruct);
   PT_INIT(&checkGPSThreadStruct);
-  
+
 
 }
 
@@ -105,26 +105,54 @@ int testCount = 0;
 void loop() {
   //newSecondThread(&newSecondThreadStruct);
   //checkGPSThread(&checkGPSThreadStruct);
-  if(gpsClockPinHigh){
-    if(listenToGPS()){
-        updateDisplayTimeWithGpsTime();
-        Serial.println("");
-        Serial.print("JULIAN DATE: "); 
-        Serial.println(julianDay(), 3);
-        Serial.print("Julian Float: "); 
-        Serial.println(julianDayFraction() + 0.5, 5);
-        Serial.print("Fraction: "); 
-        Serial.print(julianDayFractionAsLong());
-        Serial.println("");
-    }
-    updateClockState();
-    Serial.print("GPS Thread: "); 
-    Serial.println(millis(), DEC);
-    updateDisplay();
-    gpsClockPinHigh = 0;
-  }	
+  printGPS();
+  //  if(gpsClockPinHigh){
+  //    if(listenToGPS()){
+  //        updateDisplayTimeWithGpsTime();
+  //        Serial.println("");
+  //        Serial.print("JULIAN DATE: "); 
+  //        Serial.println(julianDay(), 3);
+  //        Serial.print("Julian Float: "); 
+  //        Serial.println(julianDayFraction() + 0.5, 5);
+  //        Serial.print("Fraction: "); 
+  //        Serial.print(julianDayFractionAsLong());
+  //        Serial.println("");
+  //    }
+  //    updateClockState();
+  //    Serial.print("GPS Thread: "); 
+  //    Serial.println(millis(), DEC);
+  //    updateDisplay();
+  //    gpsClockPinHigh = 0;
+  //  }	
 }
 
+void printGPS()
+{
+  uart_gps.listen();
+  while(uart_gps.available())     // While there is data on the RX pin...
+  {  
+    char c = uart_gps.read();
+    Serial.print(c); 
+    if(gps.encode(c))           // if there is a new valid sentence...
+    {
+      Serial.println("Tiny GPS Approved"); 
+    }
+  }
+}
+
+//unsigned char buffer[100]; 
+//unsigned int bufferIndex;
+//
+//void fillBuffer (void) { 
+//  uart_gps.listen();
+//  while (uart_gps.available()) {
+//    char c = uart_gps.read();
+//    buffer[bufferIndex++] = c);
+//    if (buffer [bufferIndex]==0x0D) {
+//      Serial.flush();
+//    } 
+//  }
+//}
 ///////////// THREADS //////////////
 
 
@@ -590,6 +618,8 @@ void getgps(JCTinyGPS &gps)
 }
 
 ///////////// MISC //////////////////////////
+
+
 
 
 
