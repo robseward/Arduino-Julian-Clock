@@ -163,7 +163,7 @@ bool JCTinyGPS::term_complete()
     byte checksum = 16 * from_hex(_term[0]) + from_hex(_term[1]);
     if (checksum == _parity)
     {
-      if (_gps_data_good || !gpsstrcmp(_term, _GPRMC_TERM))
+      if (_gps_data_good || _sentence_type == _GPS_SENTENCE_GPRMC)
       {
 #ifndef _GPS_NO_STATS
         ++_good_sentences;
