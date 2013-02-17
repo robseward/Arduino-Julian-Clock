@@ -1,7 +1,6 @@
 
 #include <SoftwareSerial.h>
 #include "JCTinyGPS.h"
-#include <pt.h>
 #include <stdlib.h>
 
 #define LCD_CHAR_PER_LINE 16
@@ -49,8 +48,6 @@ byte month, day, hour, minute, second, hundredths;
 
 byte displayMonth, displayDay, displayHour, displayMinute, displaySecond;
 
-static struct pt newSecondThreadStruct, checkGPSThreadStruct;
-
 volatile int gpsClockPinHigh = 0;
 
 
@@ -68,9 +65,6 @@ void setup()
   digitalWrite(LCD_RX_PIN, LOW);
   digitalWrite(LCD_TX_PIN, LOW);
 
-  //0 is INT0, equivelent to digital pin 2 (GPS_CLOCK_PIN)
-  attachInterrupt(0, gpsClockPinHighFunction, RISING);
-
   uart_gps.begin(GPS_BAUD);
   LCD.begin(LCD_BAUD);
 
@@ -83,7 +77,6 @@ void setup()
   uart_gps.write(0x0D);
   uart_gps.write(0x0A);
   delay(10);
-
   blinkLed(3, 200);
 
   clearSerLcd();
@@ -93,37 +86,27 @@ void setup()
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
   displayMessageStartTime = millis();
-  PT_INIT(&newSecondThreadStruct);
-  PT_INIT(&checkGPSThreadStruct);
-
-
 }
 
 
-int testCount = 0;
-
 void loop() {
-  //newSecondThread(&newSecondThreadStruct);
-  //checkGPSThread(&checkGPSThreadStruct);
-  printGPS();
-  //  if(gpsClockPinHigh){
-  //    if(listenToGPS()){
-  //        updateDisplayTimeWithGpsTime();
-  //        Serial.println("");
-  //        Serial.print("JULIAN DATE: "); 
-  //        Serial.println(julianDay(), 3);
-  //        Serial.print("Julian Float: "); 
-  //        Serial.println(julianDayFraction() + 0.5, 5);
-  //        Serial.print("Fraction: "); 
-  //        Serial.print(julianDayFractionAsLong());
-  //        Serial.println("");
-  //    }
-  //    updateClockState();
-  //    Serial.print("GPS Thread: "); 
-  //    Serial.println(millis(), DEC);
-  //    updateDisplay();
-  //    gpsClockPinHigh = 0;
-  //  }	
+  //printGPS();
+    if(listenToGPS()){
+        updateDisplayTimeWithGpsTime();
+        Serial.println("");
+        Serial.print("JULIAN DATE: "); 
+        Serial.println(julianDay(), 3);
+        Serial.print("Julian Float: "); 
+        Serial.println(julianDayFraction() + 0.5, 5);
+        Serial.print("Fraction: "); 
+        Serial.print(julianDayFractionAsLong());
+        Serial.println("");
+    }
+    updateClockState();
+    Serial.print("GPS Thread: "); 
+    Serial.println(millis(), DEC);
+    updateDisplay();
+    gpsClockPinHigh = 0;
 }
 
 void printGPS()
@@ -135,77 +118,12 @@ void printGPS()
     Serial.print(c); 
     if(gps.encode(c))           // if there is a new valid sentence...
     {
-      Serial.println("Tiny GPS Approved"); 
+      Serial.println(" -- Tiny GPS Approved"); 
     }
   }
 }
 
-//unsigned char buffer[100]; 
-//unsigned int bufferIndex;
-//
-//void fillBuffer (void) { 
-//  uart_gps.listen();
-//  while (uart_gps.available()) {
-//    char c = uart_gps.read();
-//    buffer[bufferIndex++] = c);
-//    if (buffer [bufferIndex]==0x0D) {
-//      Serial.flush();
-//    } 
-//  }
-//}
-///////////// THREADS //////////////
 
-
-
-static int newSecondThread(struct pt *pt) {
-  static unsigned long timestamp = 0;
-  PT_BEGIN(pt);
-  while(1) {
-    //1326 arduino milliseconds seems about equal to a real second
-    PT_WAIT_UNTIL(pt, millis() - timestamp > 1326);
-    timestamp = millis();
-
-    updateTime();
-    updateClockState();
-    updateDisplay();
-
-  }
-  PT_END(pt);
-}
-
-static int checkGPSThread(struct pt *pt) {
-  static unsigned long timestamp = 0;
-  PT_BEGIN(pt);
-  while(1) {
-    PT_WAIT_UNTIL(pt, (millis() - timestamp > 1000 || (clockState == LOOKING_FOR_SATELLITES && millis()-timestamp > 500)) );
-    timestamp = millis();
-    if(listenToGPS()){
-      updateDisplayTimeWithGpsTime();
-      Serial.println("");
-      Serial.print("JULIAN DATE: "); 
-      Serial.println(julianDay(), 3);
-      Serial.print("Julian Float: "); 
-      Serial.println(julianDayFraction() + 0.5, 5);
-      Serial.print("Fraction: "); 
-      Serial.print(julianDayFractionAsLong());
-      Serial.println("");
-    }
-    updateClockState();
-    Serial.print("GPS Thread: "); 
-    Serial.println(millis(), DEC);
-    updateDisplay();
-  }
-  PT_END(pt);
-}
-
-///////// INTERRUPT /////////
-
-void gpsClockPinHighFunction()
-{
-  Serial.println("GPS CLOCK PIN HIGH");
-  gpsClockPinHigh = 1;
-
-}
 
 //////////// CLOCK FUNCTIONS /////////////////
 
