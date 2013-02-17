@@ -59,7 +59,7 @@ bool JCTinyGPS::encode(char c)
 {
   bool valid_sentence = false;
 
-  ++_encoded_characters;
+
   switch(c)
   {
   case ',': // term terminators
@@ -163,7 +163,7 @@ bool JCTinyGPS::term_complete()
     byte checksum = 16 * from_hex(_term[0]) + from_hex(_term[1]);
     if (checksum == _parity)
     {
-      if (_gps_data_good)
+      if (_gps_data_good || !gpsstrcmp(_term, _GPRMC_TERM))
       {
 #ifndef _GPS_NO_STATS
         ++_good_sentences;
