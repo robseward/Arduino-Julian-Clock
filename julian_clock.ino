@@ -104,6 +104,8 @@ void setup()
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
   displayMessageStartTime = millis();
+  
+  //toggleSplashScreen();
 }
 
 void loop() {
@@ -481,6 +483,11 @@ void backlightSerLcd(int thePercentage){  //turns on the backlight
   int theValue = map(thePercentage, 0,100,128,157); // maps percentage to what SerLCD wants to see
   LCD.write(theValue);    //light level.
   delay(50);  
+}
+
+void toggleSplashScreen(){
+  LCD.write(0x7C);   //command flag
+  LCD.write(0x09);   //toggle splash screen command.
 }
 
 /*****  GPS ***********/
