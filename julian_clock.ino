@@ -93,8 +93,8 @@ void setup()
 
   //Enable RMC
 
-//  uart_gps.print("$PSRF103,04,00,01,01*21\r\n"); //RMC
-//  delay(10);
+  //  uart_gps.print("$PSRF103,04,00,01,01*21\r\n"); //RMC
+  //  delay(10);
 
 
   clearSerLcd();
@@ -104,13 +104,15 @@ void setup()
   Serial.println("       ...waiting for lock...           ");
   Serial.println("");
   displayMessageStartTime = millis();
-  
+
   //toggleSplashScreen();
 }
 
 void loop() {
   uart_gps.print("$PSRF103,04,01,01,01*20\r\n"); //RMC query
-  //printGPS();
+
+  // printGPS();
+  //  delay(500);
   if(listenToGPS()){
     updateDisplayTimeWithGpsTime();
     Serial.println("");
@@ -167,7 +169,7 @@ void updateClockState()
     return;
   }
 
-  if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 8000){
+  if (clockState == DISPLAY_STANDARD_TIME && millis() - displayMessageStartTime > 1000){
     clockState = DISPLAY_JULIAN_TIME;
     return;
   }
@@ -225,8 +227,7 @@ void updateDisplay()
     {
       displayLine1 = String("Julian Day:");
       String beforeDecimal((unsigned long)julianDay());
-      String afterDecimal(julianDayFractionAsLong());
-      displayLine2 = String(beforeDecimal + "." + afterDecimal);
+      displayLine2 = String(beforeDecimal + "." + julianDayFractionAsString());
       break;
     } 			
   }
@@ -284,7 +285,15 @@ float julianDayFraction()
 }
 
 unsigned long julianDayFractionAsLong(){
-  return (unsigned long)((julianDayFraction() + .5) * 10000.0f) % 10000;
+  return (unsigned long)((julianDayFraction() + 0.5) * 10000.0f) % 10000;
+}
+
+String julianDayFractionAsString(){
+  unsigned long fraction = julianDayFractionAsLong();
+  char str[6];
+  sprintf(str, "%04d", fraction);
+  return String(str);
+  
 }
 
 ///////////// COCK HELPER FUNCTIONS ////////
@@ -565,6 +574,7 @@ void getgps(JCTinyGPS &gps)
 }
 
 ///////////// MISC //////////////////////////
+
 
 
 
