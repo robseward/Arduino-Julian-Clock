@@ -93,8 +93,8 @@ void setup()
 
   //Enable RMC
 
-  //uart_gps.print("$PSRF103,04,00,01,01*21\r\n"); //RMC
-  //delay(10);
+//  uart_gps.print("$PSRF103,04,00,01,01*21\r\n"); //RMC
+//  delay(10);
 
 
   clearSerLcd();
@@ -207,7 +207,11 @@ void updateDisplay()
     break;
   case DISPLAY_STANDARD_TIME:
     {
-      displayLine1 = String(String(month) + "/" + String(day) + "/" + String(year));
+
+      //Adding tempString prevents a crash on 3/4/2013 (don't know why
+      String tempString = String(String(month) + "/" + String(day));
+      displayLine1 = String(tempString + "/" + String(year));
+      Serial.print(displayLine1);
       String hourStr = String(displayHour);
       String minuteStr = String(displayMinute);
       String secondStr = String(displaySecond);
